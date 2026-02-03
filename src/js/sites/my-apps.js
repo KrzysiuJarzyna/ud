@@ -72,13 +72,57 @@ function filterApps(target) {
 }
 
 
-function displayAllAppsHandler() {
-  const displayAllApps = document.querySelector("div.displayAllApps")
-  if (displayAllApps) /** @type {HTMLElement} */ (displayAllApps).style.display = 'none'
-  document.querySelectorAll("div.application:not(.archived)").forEach(el => {
-    /** @type {HTMLElement} */ (el).style.display = 'block'
-  })
-  triggerFilter('apps')
+async function displayAllAppsHandler(e) {
+  e.preventDefault()
+  const displayAllAppsBtn = /** @type {HTMLElement|null} */ (e.currentTarget)
+  if (!displayAllAppsBtn) return
+
+  const pageSize = parseInt(displayAllAppsBtn.dataset.pageSize || '100')
+  const offset = parseInt(displayAllAppsBtn.dataset.offset || '0')
+  const input = document.getElementById('apps')
+  const searchValue = (input && 'value' in input) ? input.value.trim() : ''
+  const searchParam = searchValue ? `&search=${encodeURIComponent(searchValue)}` : ''
+
+  displayAllAppsBtn.classList.add('disabled')
+  try {
+    const api = new Api(`/my-apps-partial.html?limit=${pageSize + 1}&offset=${offset}${searchParam}`)
+    const html = await api.getHtml()
+
+    const wrapper = document.createElement('div')
+    wrapper.innerHTML = html
+    const newItems = Array.from(wrapper.querySelectorAll('div.application'))
+    const hasMore = newItems.length > pageSize
+    if (hasMore) newItems.splice(pageSize)
+
+    const appsList = document.getElementById('apps-list')
+    if (appsList) {
+      newItems.forEach(item => {
+        appsList.appendChild(item)
+        const headers = item.getElementsByTagName('h3') || []
+        for (let h3 of headers) {
+          h3.addEventListener("click", appClickHandler)
+        }
+      })
+    }
+
+    const newOffset = offset + newItems.length
+    displayAllAppsBtn.dataset.offset = newOffset.toString()
+
+    triggerFilter('apps')
+    const activeFilter = document.querySelector(".status-filter a.active")
+    if (activeFilter) {
+      activeFilter.classList.remove("active")
+      filterApps(activeFilter)
+    }
+    updateCounters()
+
+    if (!hasMore) {
+      const displayAllApps = document.querySelector("div.displayAllApps")
+      if (displayAllApps) /** @type {HTMLElement} */ (displayAllApps).style.display = 'none'
+    }
+  } finally {
+    displayAllAppsBtn.classList.remove('disabled')
+  }
 }
 
 export function closeAllApps() {

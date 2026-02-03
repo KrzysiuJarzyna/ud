@@ -66,10 +66,12 @@
             {% include('_application-short.html.twig') %}
         {% endfor %}
     </div>
-    {% if myAppsSize < applicationsCount %}
+    {% if hasMore %}
     <div class="displayAllApps">
-        <a href="#" class="button light last">
-            To tylko {{ myAppsSize }} zgłoszeń, załaduj wszystkie
+        <a href="#" class="button light last"
+            data-offset="{{ applications|length }}"
+            data-page-size="{{ MY_APPS_PAGE_SIZE }}">
+            Załaduj kolejne
         </a>
     </div>
     {% endif %}

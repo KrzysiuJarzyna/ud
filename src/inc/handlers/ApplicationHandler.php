@@ -238,8 +238,14 @@ class ApplicationHandler extends AbstractHandler {
         $user = $request->getAttribute('user');
         $params = $request->getQueryParams();
 
+        $MY_APPS_PAGE_SIZE = 500;
         $query = $this->getParam($params, 'q', '');
-        $applications = \user\apps(user: $user, limit:7000); //, search: $query);
+        $search = trim($query) === '' ? 'all' : $query;
+        $applications = \user\apps(user: $user, search: $search, limit: $MY_APPS_PAGE_SIZE + 1, offset: 0);
+        $hasMore = count($applications) > $MY_APPS_PAGE_SIZE;
+        if ($hasMore) {
+            $applications = array_slice($applications, 0, $MY_APPS_PAGE_SIZE);
+        }
 
         $countChanged = 0;
 
@@ -248,7 +254,9 @@ class ApplicationHandler extends AbstractHandler {
             'applications' => $applications,
             'countChanged' => $countChanged,
             'applicationsCount' => count($applications),
-            'myAppsSize' => 500,
+            'myAppsSize' => $MY_APPS_PAGE_SIZE,
+            'MY_APPS_PAGE_SIZE' => $MY_APPS_PAGE_SIZE,
+            'hasMore' => $hasMore,
             'isAdmin'  => $user->isAdmin(),
             'query' => urldecode($query)
         ]);
@@ -274,7 +282,7 @@ class ApplicationHandler extends AbstractHandler {
 
         $params = $request->getQueryParams();
         $status = $this->getParam($params, 'status', 'all');
-        $search = $this->getParam($params, 'search', '%');
+        $search = $this->getParam($params, 'search', 'all');
         $limit =  $this->getParam($params, 'limit', 0);
         $offset = $this->getParam($params, 'offset', 0);
         
