@@ -3,7 +3,8 @@
 import { updateCounters } from "../lib/status";
 import { setStatus } from "../lib/status"
 import Api from '../lib/Api'
-import { filterable, triggerFilter} from "../lib/filterable";
+import { filterable } from "../lib/filterable";
+import delay from "../lib/delay";
 import makeDropdown from "../lib/dropdown";
 import makeDialog from "../lib/dialog";
 import sendApplication from "../lib/send";
@@ -13,25 +14,24 @@ document.addEventListener("DOMContentLoaded", (event) => {
   const appsList = document.getElementById('apps-list')
   if (!appsList) return
 
-  filterable('apps', 'apps-list')
+  const searchInput = document.getElementById('apps')
+  if (searchInput?.dataset.serverSearch === '1') {
+    const form = searchInput.closest('form')
+    const pageInput = form?.querySelector('input[name="page"]')
+    searchInput.addEventListener("input", delay(function () {
+      if (!form) return
+      if (pageInput) pageInput.value = '1'
+      form.submit()
+    }, 1200), false)
+  } else {
+    filterable('apps', 'apps-list')
+  }
   makeDialog()
 
   // app headers clickable
   const appHeaders = appsList?.getElementsByTagName('h3') || []
   for (let h3 of appHeaders)
     h3.addEventListener("click", appClickHandler)
-
-  // filters
-  const hash = window.location.hash.substring(1)
-  const filters = document.querySelectorAll(".status-filter a") || []
-  for (let filter of filters) {
-      filter.addEventListener("click", filterAppsHandler)
-      if (filter.id == hash) filterApps(filter)
-  }
-
-  // show all apps button
-  const displayAllAppsBtn = document.querySelector("div.displayAllApps a")
-  displayAllAppsBtn?.addEventListener("click", displayAllAppsHandler)
 
   // close „recydywa” dialong on Esc
   const recydywaElement = document.getElementById('recydywa')
@@ -48,82 +48,6 @@ document.addEventListener("DOMContentLoaded", (event) => {
   
   updateCounters()
 })
-
-function filterAppsHandler() {
-  filterApps(this)
-}
-
-function filterApps(target) {
-    if (target.classList.contains('active')) {
-      target.classList.remove("active")
-      document.querySelectorAll("div.application:not(.archived)").forEach(el => {
-        /** @type {HTMLElement} */ (el).style.display = 'block'
-      })
-      return
-    }
-    document.querySelectorAll("div.application").forEach(el => {
-      /** @type {HTMLElement} */ (el).style.display = 'none'
-    })
-    document.querySelectorAll("div.application." + target.id).forEach(el => {
-      /** @type {HTMLElement} */ (el).style.display = 'block'
-    })
-    document.querySelectorAll(".status-filter a").forEach(el => el.classList.remove("active"))
-    target.classList.add("active")
-}
-
-
-async function displayAllAppsHandler(e) {
-  e.preventDefault()
-  const displayAllAppsBtn = /** @type {HTMLElement|null} */ (e.currentTarget)
-  if (!displayAllAppsBtn) return
-
-  const pageSize = parseInt(displayAllAppsBtn.dataset.pageSize || '100')
-  const offset = parseInt(displayAllAppsBtn.dataset.offset || '0')
-  const input = document.getElementById('apps')
-  const searchValue = (input && 'value' in input) ? input.value.trim() : ''
-  const searchParam = searchValue ? `&search=${encodeURIComponent(searchValue)}` : ''
-
-  displayAllAppsBtn.classList.add('disabled')
-  try {
-    const api = new Api(`/my-apps-partial.html?limit=${pageSize + 1}&offset=${offset}${searchParam}`)
-    const html = await api.getHtml()
-
-    const wrapper = document.createElement('div')
-    wrapper.innerHTML = html
-    const newItems = Array.from(wrapper.querySelectorAll('div.application'))
-    const hasMore = newItems.length > pageSize
-    if (hasMore) newItems.splice(pageSize)
-
-    const appsList = document.getElementById('apps-list')
-    if (appsList) {
-      newItems.forEach(item => {
-        appsList.appendChild(item)
-        const headers = item.getElementsByTagName('h3') || []
-        for (let h3 of headers) {
-          h3.addEventListener("click", appClickHandler)
-        }
-      })
-    }
-
-    const newOffset = offset + newItems.length
-    displayAllAppsBtn.dataset.offset = newOffset.toString()
-
-    triggerFilter('apps')
-    const activeFilter = document.querySelector(".status-filter a.active")
-    if (activeFilter) {
-      activeFilter.classList.remove("active")
-      filterApps(activeFilter)
-    }
-    updateCounters()
-
-    if (!hasMore) {
-      const displayAllApps = document.querySelector("div.displayAllApps")
-      if (displayAllApps) /** @type {HTMLElement} */ (displayAllApps).style.display = 'none'
-    }
-  } finally {
-    displayAllAppsBtn.classList.remove('disabled')
-  }
-}
 
 export function closeAllApps() {
   const expanded = document.querySelectorAll("#apps-list .expanded")

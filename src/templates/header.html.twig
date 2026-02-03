@@ -1,7 +1,7 @@
 {% block header %}
 <header>
     <h1>
-        <a href="{{ general.uri }}">{{ shortTitle ?? title }}
+        <a href="{{ general.headerLink ?? general.uri }}">{{ shortTitle ?? title }}
         {% if general.isStaging %}
             <sup>[STG]</sup>
         {% elseif general.isProd %}

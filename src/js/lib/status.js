@@ -85,8 +85,9 @@ export function updateCounters() {
   statusFilterItems.forEach((item) => {
     const firstChild = item.children[0]
     if (firstChild && firstChild.id) {
-      const count = document.querySelectorAll("div.application." + firstChild.id).length;
       const secondChild = item.children[1]
+      const rawCount = item.getAttribute('data-count') || (secondChild && secondChild.getAttribute('data-count')) || '0'
+      const count = parseInt(rawCount || '0')
       if (secondChild) {
         secondChild.textContent = count.toString();
       }
@@ -104,8 +105,9 @@ export function updateCounters() {
       const currentCount = parseInt(sendMenu.textContent || '0')
       sendMenu.textContent = (currentCount - 1).toString()
     } else {
-      const confirmedApps = document.querySelectorAll("div.application.confirmed")
-      sendMenu.textContent = confirmedApps.length.toString();
+      const confirmedItem = document.querySelector(".status-filter li.confirmed")
+      const rawCount = confirmedItem?.getAttribute('data-count') || '0'
+      sendMenu.textContent = parseInt(rawCount || '0').toString();
     }
     if (parseInt(sendMenu.textContent || '0') <= 0) {
       const parent = /** @type {HTMLElement} */ (sendMenu.parentElement)

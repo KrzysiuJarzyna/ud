@@ -15,7 +15,7 @@
 <p><b>(zmieniliśmy status {{ countChanged }} zgłoszeń)</b></p>
 {% endif %}
 
-{% if applications|length == 0 %}
+{% if totalCountAll == 0 %}
     <p>Nie masz jeszcze ani jednego zgłoszenia.</p>
     <a href="/nowe-zgloszenie.html" class="button cta last">Stwórz nowe</a>
 {% else %}
@@ -23,7 +23,7 @@
 
     {% if isAdmin or 'patron' in general.stats.badges %}
     <p><a href="/zgloszenia.xlsx">Pobierz</a> wszystkie zgłoszenia w jednym pliku xls.</p>
-    {% elseif applicationsCount > 50 %}
+    {% elseif totalCount > 50 %}
         <p>Dużo zgłoszeń? <a href="/patronite.html">Patroni i Patronki</a> mogą pobierać zgłoszenia w pliku xls.</p>
     {% endif %}
 
@@ -33,12 +33,22 @@
     {% endif %}
 
 
-    <form autocomplete="off">
-        <input autocomplete="false" data-type="filterable" type="text" id="apps"
-            placeholder="Adres, numer rej. lub zgłoszenia, data, komentarz" value="{{ query }}">
+    <form autocomplete="off" method="get" action="/moje-zgloszenia.html">
+        <input autocomplete="false" data-type="filterable" data-server-search="1" type="text" id="apps" name="q"
+            placeholder="Numer rej. lub numer zgłoszenia" value="{{ query }}">
+        <input type="hidden" name="page" value="1">
+        <input type="hidden" name="status" value="{{ currentStatus }}">
         <ul class="status-filter">
         {% for key,val in statuses %}
-            <li class="status {{key}}"><a href="#" id="{{ key }}">{{ val.name|upper }}</a> <span class="li-count"></span></li>
+            {% set count = statusCounts[key] ?? 0 %}
+            <li class="status {{key}}" data-count="{{ count }}" {% if count == 0 %}style="display: none;"{% endif %}>
+                {% if currentStatus == key %}
+                    <a href="/moje-zgloszenia.html?page=1{% if query %}&q={{ query|url_encode }}{% endif %}" id="{{ key }}" class="active">{{ val.name|upper }}</a>
+                {% else %}
+                    <a href="/moje-zgloszenia.html?page=1&status={{ key }}{% if query %}&q={{ query|url_encode }}{% endif %}" id="{{ key }}">{{ val.name|upper }}</a>
+                {% endif %}
+                <span class="li-count" data-count="{{ count }}">{{ count }}</span>
+            </li>
         {% endfor %}
         </ul>
     </form>
@@ -59,20 +69,61 @@
     </div>
 
     <div data-role="collapsibleset" data-iconpos="right" data-filter="true" id="apps-list">
-        {% for app in applications %}
-            {% if loop.index0 >= myAppsSize %}
-                {% set hideAppOverLimit = true %}
-            {% endif %}
-            {% include('_application-short.html.twig') %}
-        {% endfor %}
+        {% if totalCount == 0 %}
+            <p class="empty-filtered">
+                Nie znaleziono zgłoszeń spełniających kryteria wyszukiwania.
+                <a href="/moje-zgloszenia.html">Pokaż wszystkie</a>
+            </p>
+        {% else %}
+            {% for app in applications %}
+                {% include('_application-short.html.twig') %}
+            {% endfor %}
+        {% endif %}
     </div>
-    {% if hasMore %}
-    <div class="displayAllApps">
-        <a href="#" class="button light last"
-            data-offset="{{ applications|length }}"
-            data-page-size="{{ MY_APPS_PAGE_SIZE }}">
-            Załaduj kolejne
-        </a>
+    {% if totalPages > 1 %}
+    <div class="pagination">
+        {% set statusParam = currentStatus != 'all' ? '&status=' ~ currentStatus : '' %}
+        {% set queryParam = query ? '&q=' ~ query|url_encode : '' %}
+        {% set window = 2 %}
+        {% set start = currentPage - window %}
+        {% set end = currentPage + window %}
+        {% if start < 1 %}{% set start = 1 %}{% endif %}
+        {% if end > totalPages %}{% set end = totalPages %}{% endif %}
+        {% if currentPage > 1 %}
+            <a class="button light page page-nav prev" href="/moje-zgloszenia.html?page={{ currentPage - 1 }}{{ statusParam }}{{ queryParam }}">Poprzednia</a>
+        {% endif %}
+        {% if totalPages >= 1 %}
+            {% if currentPage == 1 %}
+                <span class="page current num">1</span>
+            {% else %}
+                <a class="button light page num" href="/moje-zgloszenia.html?page=1{{ statusParam }}{{ queryParam }}">1</a>
+            {% endif %}
+        {% endif %}
+        {% if start > 2 %}
+            <span class="page ellipsis">…</span>
+        {% endif %}
+        {% for p in start..end %}
+            {% if p > 1 and p < totalPages %}
+                {% if p == currentPage %}
+                    <span class="page current num">{{ p }}</span>
+                {% else %}
+                    <a class="button light page num" href="/moje-zgloszenia.html?page={{ p }}{{ statusParam }}{{ queryParam }}">{{ p }}</a>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+        {% if end < totalPages - 1 %}
+            <span class="page ellipsis">…</span>
+        {% endif %}
+        {% if totalPages > 1 %}
+            {% if currentPage == totalPages %}
+                <span class="page current num">{{ totalPages }}</span>
+            {% else %}
+                <a class="button light page num" href="/moje-zgloszenia.html?page={{ totalPages }}{{ statusParam }}{{ queryParam }}">{{ totalPages }}</a>
+            {% endif %}
+        {% endif %}
+        {% if currentPage < totalPages %}
+            <a class="button light page page-nav next" href="/moje-zgloszenia.html?page={{ currentPage + 1 }}{{ statusParam }}{{ queryParam }}">Następna</a>
+        {% endif %}
     </div>
     {% endif %}
 {% endif %}

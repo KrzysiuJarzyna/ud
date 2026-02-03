@@ -240,12 +240,24 @@ class ApplicationHandler extends AbstractHandler {
 
         $MY_APPS_PAGE_SIZE = 500;
         $query = $this->getParam($params, 'q', '');
+        $status = $this->getParam($params, 'status', 'all');
+        $page = max(1, (int) $this->getParam($params, 'page', 1));
+
+        // TODO(search): address fields may be encrypted. Options:
+        // 1) Remove address from search and only allow non-encrypted fields.
+        // 2) Add a dedicated, denormalized SQL search index for encrypted fields (preferred long-term).
+        // 3) Fetch, decrypt, and filter in application code (NOT recommended).
+        // Decision intentionally deferred.
         $search = trim($query) === '' ? 'all' : $query;
-        $applications = \user\apps(user: $user, search: $search, limit: $MY_APPS_PAGE_SIZE + 1, offset: 0);
-        $hasMore = count($applications) > $MY_APPS_PAGE_SIZE;
-        if ($hasMore) {
-            $applications = array_slice($applications, 0, $MY_APPS_PAGE_SIZE);
+        $totalCountAll = \user\appsCount($user, 'all', 'all');
+        $totalCount = \user\appsCount($user, $status, $search);
+        $totalPages = (int) ceil($totalCount / $MY_APPS_PAGE_SIZE);
+        if ($totalPages > 0 && $page > $totalPages) {
+            $page = $totalPages;
         }
+        $offset = ($page - 1) * $MY_APPS_PAGE_SIZE;
+        $applications = \user\apps(user: $user, status: $status, search: $search, limit: $MY_APPS_PAGE_SIZE, offset: $offset);
+        $statusCounts = \user\appsCountByStatus($user, $search, $status);
 
         $countChanged = 0;
 
@@ -253,12 +265,17 @@ class ApplicationHandler extends AbstractHandler {
             'appActionButtons' => true,
             'applications' => $applications,
             'countChanged' => $countChanged,
-            'applicationsCount' => count($applications),
-            'myAppsSize' => $MY_APPS_PAGE_SIZE,
-            'MY_APPS_PAGE_SIZE' => $MY_APPS_PAGE_SIZE,
-            'hasMore' => $hasMore,
+            'totalCount' => $totalCount,
+            'totalCountAll' => $totalCountAll,
+            'totalPages' => $totalPages,
+            'currentPage' => $page,
+            'currentStatus' => $status,
+            'statusCounts' => $statusCounts,
             'isAdmin'  => $user->isAdmin(),
-            'query' => urldecode($query)
+            'query' => urldecode($query),
+            'general' => [
+                'headerLink' => '/moje-zgloszenia.html'
+            ]
         ]);
     }
 

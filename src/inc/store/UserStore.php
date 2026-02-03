@@ -88,7 +88,10 @@ function apps(User $user, string $status = 'all', string $search = 'all', int $l
     $whereSearch = '';
     if ($search !== 'all') {
         $whereSearch = <<<SQL
-            and lower(value) like lower(:search)
+            and (
+                lower(plateId) like lower(:search)
+                or cast(json_extract(value, '$.number') as text) like :search
+            )
         SQL;
         $params += [':search' => "%$search%"];
     }
@@ -109,6 +112,92 @@ function apps(User $user, string $status = 'all', string $search = 'all', int $l
 
     return $stmt->fetchAll(\PDO::FETCH_FUNC,
         fn($json, $email) => \app\Application::withJson($json, $email));
+}
+
+function appsCount(User $user, string $status = 'all', string $search = 'all'): int {
+    $userEmail = $user->getEmail();
+
+    $params = [':email' => $userEmail];
+
+    $whereStatus = <<<SQL
+        and json_extract(value, '$.status') not in ('ready', 'draft')
+    SQL;
+    if ($status == 'allWithDrafts') {
+        $whereStatus = '';
+    } elseif ($status !== 'all') {
+        $whereStatus = <<<SQL
+            and json_extract(value, '$.status') = :status
+        SQL;
+        $params += [':status' => $status];
+    }
+
+    $whereSearch = '';
+    if ($search !== 'all') {
+        $whereSearch = <<<SQL
+            and (
+                lower(plateId) like lower(:search)
+                or cast(json_extract(value, '$.number') as text) like :search
+            )
+        SQL;
+        $params += [':search' => "%$search%"];
+    }
+
+    $sql = <<<SQL
+        select count(*)
+        from applications
+        where email = :email
+            $whereStatus
+            $whereSearch
+    SQL;
+
+    $stmt = \store\prepare($sql);
+    $stmt->execute($params);
+
+    return (int) ($stmt->fetchColumn() ?: 0);
+}
+
+function appsCountByStatus(User $user, string $search = 'all', string $status = 'all'): array {
+    $userEmail = $user->getEmail();
+
+    $params = [':email' => $userEmail];
+
+    $whereStatus = <<<SQL
+        and json_extract(value, '$.status') not in ('ready', 'draft')
+    SQL;
+    if ($status == 'allWithDrafts') {
+        $whereStatus = '';
+    } elseif ($status !== 'all') {
+        $whereStatus = <<<SQL
+            and json_extract(value, '$.status') = :status
+        SQL;
+        $params += [':status' => $status];
+    }
+
+    $whereSearch = '';
+    if ($search !== 'all') {
+        $whereSearch = <<<SQL
+            and (
+                lower(plateId) like lower(:search)
+                or cast(json_extract(value, '$.number') as text) like :search
+            )
+        SQL;
+        $params += [':search' => "%$search%"];
+    }
+
+    $sql = <<<SQL
+        select json_extract(value, '$.status') as status, count(*) as cnt
+        from applications
+        where email = :email
+            $whereStatus
+            $whereSearch
+        group by 1
+    SQL;
+
+    $stmt = \store\prepare($sql);
+    $stmt->execute($params);
+
+    $rows = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
+    return $rows ?: [];
 }
 
 
